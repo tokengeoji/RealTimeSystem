@@ -5,29 +5,30 @@
 ## Grouped layout
 
 ```text
-LAB0/
-LAB1/
-LAB2/                 # LAB2 기본 버전
-├─ LAB2A/
-├─ LAB2B/
-└─ LAB2C/
-LAB3/
-└─ LAB3A/
-LAB4/
-├─ LAB4A/
-└─ LAB4B/
-LAB5/
-├─ LAB5A/
-├─ LAB5B/
-├─ LAB5C/
-├─ LAB5D/
-└─ LAB5E/
-LAB6/
-├─ LAB6A/
-├─ LAB6B/
-├─ LAB6C/
-└─ LAB6D/
-LAB7/
+labs/
+├─ LAB0/
+├─ LAB1/
+├─ LAB2/                 # LAB2 기본 버전
+│  ├─ LAB2A/
+│  ├─ LAB2B/
+│  └─ LAB2C/
+├─ LAB3/
+│  └─ LAB3A/
+├─ LAB4/
+│  ├─ LAB4A/
+│  └─ LAB4B/
+├─ LAB5/
+│  ├─ LAB5A/
+│  ├─ LAB5B/
+│  ├─ LAB5C/
+│  ├─ LAB5D/
+│  └─ LAB5E/
+├─ LAB6/
+│  ├─ LAB6A/
+│  ├─ LAB6B/
+│  ├─ LAB6C/
+│  └─ LAB6D/
+└─ LAB7/
 ```
 
 ## LAB0–LAB1: board I/O base
@@ -36,9 +37,9 @@ LAB7/
 |---|---|
 | `LAB0` | `hello.c`와 `OMAPL138.cmd`로 C6740 프로젝트 시작과 메모리 배치를 확인한다. |
 | `LAB1` | `main.c`에서 GPIO를 polling한다. 현재 활성 `#else` branch는 두 push button 상태에 따라 LED 그룹을 토글한다. 파일 안의 `#if 0` branch에는 DIP switch 기반 `LAB1` 예제가 남아 있다. |
-| `LAB1A` | 별도 CCS 폴더가 아니다. `LAB1/main.c`의 활성 `#else` branch에 있는 push-button 예제의 표시명이다. |
+| `LAB1A` | 별도 CCS 폴더가 아니다. `labs/LAB1/main.c`의 활성 `#else` branch에 있는 push-button 예제의 표시명이다. |
 
-따라서 `LAB1A/`를 새 프로젝트로 복사하지 않았다. 현재 소스의 compile-time branch를 그대로 보존하는 것이 코드 변경이 가장 적고, 두 예제를 모두 확인할 수 있다.
+따라서 `labs/LAB1A/`를 새 프로젝트로 복사하지 않았다. 현재 소스의 compile-time branch를 그대로 보존하는 것이 코드 변경이 가장 적고, 두 예제를 모두 확인할 수 있다.
 
 ## LAB2: GPIO interrupt, timer, debounce
 
@@ -107,11 +108,11 @@ LAB7/
 
 `LAB7`은 `LAB5D`의 block-level Hwi/Swi 구조에 EDMA3를 연결한 최종 경로다.
 
-- `main.c`: PINMUX, GPIO, I2C, codec, McASP, EDMA와 BIOS 시작 순서를 구성한다.
-- `lib/EDMA_McASP.c`: McASP RX/TX PARAMSET의 source/destination, ACNT=4, BCNT=400, CCNT=1을 설정한다.
-- `HWI.c`: EDMA 완료를 확인하고 다음 input/output ping/pong 주소를 `PARAMSET`에 기록한 뒤 `Swi_or`를 호출한다.
-- `SWI.c`: `Swi_getTrigger()`로 완료된 input buffer를 선택해 talk-through 또는 2 Hz 진폭 변조를 실행한다.
-- `app.cfg`: Timer1 Hwi, GPIO Hwi, EDMA Hwi, SWI0, Idle callback을 등록한다.
+- `labs/LAB7/main.c`: PINMUX, GPIO, I2C, codec, McASP, EDMA와 BIOS 시작 순서를 구성한다.
+- `labs/LAB7/lib/EDMA_McASP.c`: McASP RX/TX PARAMSET의 source/destination, ACNT=4, BCNT=400, CCNT=1을 설정한다.
+- `labs/LAB7/HWI.c`: EDMA 완료를 확인하고 다음 input/output ping/pong 주소를 `PARAMSET`에 기록한 뒤 `Swi_or`를 호출한다.
+- `labs/LAB7/SWI.c`: `Swi_getTrigger()`로 완료된 input buffer를 선택해 talk-through 또는 2 Hz 진폭 변조를 실행한다.
+- `labs/LAB7/app.cfg`: Timer1 Hwi, GPIO Hwi, EDMA Hwi, SWI0, Idle callback을 등록한다.
 
 최종 버전에서 `EDMA_LINK` 매크로는 정의되어 있지 않으므로, 활성 경로는 정적 link chain만으로 순환하지 않고 Hwi가 PARAMSET 주소와 count를 직접 갱신하는 방식이다.
 
@@ -119,5 +120,5 @@ LAB7/
 
 - 여러 LAB에는 교육 단계에서 복사된 공통 `lib/` 파일이 각각 존재한다. 이를 하나의 공통 라이브러리로 합치면 CCS 프로젝트의 include/link 설정까지 바뀌므로 이번 정리에서는 복사본을 유지했다.
 - `LAB5A`, `LAB5B`, `LAB5C`, `LAB5D`, `LAB7`의 모드 매크로는 `DELEY`라고 이름 붙었지만 해당 최종 구현은 delay line이 아니라 진폭 변조다.
-- `LAB5/LAB5E/main.c`의 입력 경로는 `..\\Input.note`이며 저장소의 샘플 파일은 `LAB5/LAB5E/input.note`다. 실행 전에 CCS working directory 또는 경로를 맞춰야 한다.
+- `labs/LAB5/LAB5E/main.c`의 입력 경로는 `..\\Input.note`이며 저장소의 샘플 파일은 `labs/LAB5/LAB5E/input.note`다. 실행 전에 CCS working directory 또는 경로를 맞춰야 한다.
 - Hwi 내부의 EDMA 완료 대기와 일부 busy-wait는 교육용 구현에 남아 있다. 제품용 전환 시 ISR 실행 시간과 overrun/underrun을 측정해야 한다.
