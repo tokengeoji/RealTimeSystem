@@ -1,0 +1,9 @@
+menuitem "Control"
+
+slider Volume( 5000, 30000, 10, 100, _vol ) {
+    vol = _vol;
+}
+
+slider Frequency( 100, 500, 10, 50, _freq ) {
+    freq = _freq;
+}

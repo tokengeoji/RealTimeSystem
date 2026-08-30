@@ -1,0 +1,3 @@
+SECTIONS {
+	.image : { } > DDR
+	}

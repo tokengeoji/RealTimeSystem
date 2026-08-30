@@ -1,0 +1,24 @@
+# CCS workspace and local caches
+.metadata/
+.jxbrowser-data/
+.platformWizard/
+RemoteSystemsTempFiles/
+dvt/
+
+# Generated CCS/XDC/SYS/BIOS files
+**/.settings/
+**/.launches/
+**/.config/
+**/Debug/
+**/src/
+
+# Compiler and linker output
+*.obj
+*.out
+*.map
+*.d
+*.o
+*.a
+
+# Local archive copies
+*.zip

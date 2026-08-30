@@ -1,0 +1,355 @@
+/*
+ *  ======== main.c ========
+ */
+
+#include <xdc/std.h>
+#include <xdc/runtime/System.h>
+#include <ti/sysbios/BIOS.h>
+#include <xdc/cfg/global.h>
+
+#include <stdio.h>
+#include "init.h"
+#include "LED_DIPSW.h"
+
+
+#include "image.h"
+
+#define LINES_PER_DISP  (X_SIZE*3)
+#define PIXELS_PER_LINE (X_SIZE*3)
+#define PIXELS_IN_IMAGE (LINES_PER_DISP*PIXELS_PER_LINE)
+
+#pragma DATA_SECTION( image, ".image")
+Uint8 image[PIXELS_IN_IMAGE];
+
+CSL_Edma3ccRegsOvly edma3ccRegs = (CSL_Edma3ccRegsOvly)(CSL_EDMA30CC_0_REGS);
+
+void ResetEDMA3( void ) {
+    edma3ccRegs->TPCC_EMCR       = 0xFFFFFFFF;
+    edma3ccRegs->TPCC_CCERRCLR   = 0xFFFFFFFF;
+    edma3ccRegs->TPCC_SECR       = 0xFFFFFFFF;
+    edma3ccRegs->TPCC_ECR        = 0xFFFFFFFF;
+    edma3ccRegs->TPCC_ICR        = 0xFFFFFFFF;
+    edma3ccRegs->TPCC_EECR       = 0xFFFFFFFF;
+    edma3ccRegs->TPCC_IECR       = 0xFFFFFFFF;
+}
+
+
+void SetupEDMA3( Uint32 edma_evt, int i, int j  )
+{
+    edma3ccRegs->PARAMSET[edma_evt].SRC = (Uint32)image;
+    edma3ccRegs->PARAMSET[edma_evt].DST = (Uint32)image + i*PIXELS_IN_IMAGE/3 + j*PIXELS_PER_LINE/3;
+
+    edma3ccRegs->PARAMSET[edma_evt].OPT =             CSL_TPCC_PARAM_OPT_RESETVAL
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_TCINTEN, ENABLE)
+                                                    | CSL_FMK(TPCC_PARAM_OPT_TCC, edma_evt)
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_SYNCDIM, ABSYNC);
+
+    edma3ccRegs->PARAMSET[edma_evt].A_B_CNT =         CSL_FMK(TPCC_PARAM_A_B_CNT_BCNT, X_SIZE)
+                                                    | CSL_FMK(TPCC_PARAM_A_B_CNT_ACNT, 1);
+    edma3ccRegs->PARAMSET[edma_evt].SRC_DST_BIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_DSTBIDX, 1)
+                                                    | CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_SRCBIDX, 1);
+    edma3ccRegs->PARAMSET[edma_evt].LINK_BCNTRLD =    CSL_FMK(TPCC_PARAM_LINK_BCNTRLD_LINK, 0xFFFF);
+    edma3ccRegs->PARAMSET[edma_evt].SRC_DST_CIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_DSTCIDX, PIXELS_PER_LINE)
+                                                    | CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_SRCCIDX, PIXELS_PER_LINE);
+    edma3ccRegs->PARAMSET[edma_evt].CCNT = Y_SIZE;
+}
+
+void SetupEDMA3Parallel( Uint32 edma_evt, int i, int j, int offset  )
+{
+    edma3ccRegs->PARAMSET[edma_evt].SRC = (Uint32)image;
+    edma3ccRegs->PARAMSET[edma_evt].DST = (Uint32)image + i*PIXELS_IN_IMAGE/3 + j*PIXELS_PER_LINE/3 + offset;
+
+    edma3ccRegs->PARAMSET[edma_evt].OPT =             CSL_TPCC_PARAM_OPT_RESETVAL
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_TCINTEN, ENABLE)
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_ITCCHEN, ENABLE)
+                                                    | CSL_FMK(TPCC_PARAM_OPT_TCC, edma_evt)
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_SYNCDIM, ABSYNC);
+
+    edma3ccRegs->PARAMSET[edma_evt].A_B_CNT =         CSL_FMK(TPCC_PARAM_A_B_CNT_BCNT, X_SIZE)
+                                                    | CSL_FMK(TPCC_PARAM_A_B_CNT_ACNT, 1);
+    edma3ccRegs->PARAMSET[edma_evt].SRC_DST_BIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_DSTBIDX, PIXELS_PER_LINE+2)
+                                                    | CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_SRCBIDX, 1);
+    edma3ccRegs->PARAMSET[edma_evt].LINK_BCNTRLD =    CSL_FMK(TPCC_PARAM_LINK_BCNTRLD_LINK, 0xFFFF);
+    edma3ccRegs->PARAMSET[edma_evt].SRC_DST_CIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_DSTCIDX, PIXELS_PER_LINE)
+                                                    | CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_SRCCIDX, PIXELS_PER_LINE);
+    edma3ccRegs->PARAMSET[edma_evt].CCNT = Y_SIZE;
+}
+
+void SetupEDMA3Parallel2( Uint32 edma_evt, int i, int j, int offset  )
+{
+    edma3ccRegs->PARAMSET[edma_evt].SRC = (Uint32)image;
+    edma3ccRegs->PARAMSET[edma_evt].DST = (Uint32)image + i*PIXELS_IN_IMAGE/3 + j*PIXELS_PER_LINE/3 + offset;
+
+    edma3ccRegs->PARAMSET[edma_evt].OPT =             CSL_TPCC_PARAM_OPT_RESETVAL
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_TCINTEN, ENABLE)
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_ITCCHEN, ENABLE)
+                                                    | CSL_FMK(TPCC_PARAM_OPT_TCC, edma_evt)
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_SYNCDIM, ABSYNC);
+
+    edma3ccRegs->PARAMSET[edma_evt].A_B_CNT =         CSL_FMK(TPCC_PARAM_A_B_CNT_BCNT, X_SIZE)
+                                                    | CSL_FMK(TPCC_PARAM_A_B_CNT_ACNT, 1);
+    edma3ccRegs->PARAMSET[edma_evt].SRC_DST_BIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_DSTBIDX, PIXELS_PER_LINE+2)
+                                                    | CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_SRCBIDX, 1);
+    edma3ccRegs->PARAMSET[edma_evt].LINK_BCNTRLD =    CSL_FMK(TPCC_PARAM_LINK_BCNTRLD_LINK, 0xFFFF);
+    edma3ccRegs->PARAMSET[edma_evt].SRC_DST_CIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_DSTCIDX, PIXELS_PER_LINE-1)
+                                                    | CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_SRCCIDX, PIXELS_PER_LINE);
+    edma3ccRegs->PARAMSET[edma_evt].CCNT = Y_SIZE;
+}
+
+
+void SetupEDMA3Diamond( Uint32 edma_evt, int i, int j, int offset  )
+{
+    edma3ccRegs->PARAMSET[edma_evt].SRC = (Uint32)image;
+    edma3ccRegs->PARAMSET[edma_evt].DST = (Uint32)image + i*PIXELS_IN_IMAGE/3 + j*PIXELS_PER_LINE/3 + offset;
+
+    edma3ccRegs->PARAMSET[edma_evt].OPT =             CSL_TPCC_PARAM_OPT_RESETVAL
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_TCINTEN, ENABLE)
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_ITCCHEN, ENABLE)
+                                                    | CSL_FMK(TPCC_PARAM_OPT_TCC, edma_evt)
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_SYNCDIM, ABSYNC);
+
+    edma3ccRegs->PARAMSET[edma_evt].A_B_CNT =         CSL_FMK(TPCC_PARAM_A_B_CNT_BCNT, X_SIZE)
+                                                    | CSL_FMK(TPCC_PARAM_A_B_CNT_ACNT, 1);
+    edma3ccRegs->PARAMSET[edma_evt].SRC_DST_BIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_DSTBIDX, PIXELS_PER_LINE+1)
+                                                    | CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_SRCBIDX, 1);
+    edma3ccRegs->PARAMSET[edma_evt].LINK_BCNTRLD =    CSL_FMK(TPCC_PARAM_LINK_BCNTRLD_LINK, 0xFFFF);
+    edma3ccRegs->PARAMSET[edma_evt].SRC_DST_CIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_DSTCIDX, PIXELS_PER_LINE-1)
+                                                    | CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_SRCCIDX, PIXELS_PER_LINE);
+    edma3ccRegs->PARAMSET[edma_evt].CCNT = Y_SIZE;
+}
+
+void SetupEDMA3DiamondR( Uint32 edma_evt, int i, int j, int offset  )
+{
+    edma3ccRegs->PARAMSET[edma_evt].SRC = (Uint32)image;
+    edma3ccRegs->PARAMSET[edma_evt].DST = (Uint32)image + i*PIXELS_IN_IMAGE/3 + j*PIXELS_PER_LINE/3 + offset;
+
+    edma3ccRegs->PARAMSET[edma_evt].OPT =             CSL_TPCC_PARAM_OPT_RESETVAL
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_TCINTEN, ENABLE)
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_ITCCHEN, ENABLE)
+                                                    | CSL_FMK(TPCC_PARAM_OPT_TCC, edma_evt)
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_SYNCDIM, ABSYNC);
+
+    edma3ccRegs->PARAMSET[edma_evt].A_B_CNT =         CSL_FMK(TPCC_PARAM_A_B_CNT_BCNT, X_SIZE)
+                                                    | CSL_FMK(TPCC_PARAM_A_B_CNT_ACNT, 1);
+    edma3ccRegs->PARAMSET[edma_evt].SRC_DST_BIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_DSTBIDX, PIXELS_PER_LINE+1)
+                                                    | CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_SRCBIDX, 1);
+    edma3ccRegs->PARAMSET[edma_evt].LINK_BCNTRLD =    CSL_FMK(TPCC_PARAM_LINK_BCNTRLD_LINK, 0xFFFF);
+    edma3ccRegs->PARAMSET[edma_evt].SRC_DST_CIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_DSTCIDX, -PIXELS_PER_LINE+1)
+                                                    | CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_SRCCIDX, PIXELS_PER_LINE);
+    edma3ccRegs->PARAMSET[edma_evt].CCNT = Y_SIZE;
+}
+
+void SetupEDMA3LRFlip( Uint32 edma_evt, int i, int j  )
+{
+    edma3ccRegs->PARAMSET[edma_evt].SRC = (Uint32)image;
+    edma3ccRegs->PARAMSET[edma_evt].DST = (Uint32)image + i*PIXELS_IN_IMAGE/3 + (j+1)*PIXELS_PER_LINE/3 - 1;
+
+    edma3ccRegs->PARAMSET[edma_evt].OPT =             CSL_TPCC_PARAM_OPT_RESETVAL
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_TCINTEN, ENABLE)
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_ITCCHEN, ENABLE)
+                                                    | CSL_FMK(TPCC_PARAM_OPT_TCC, edma_evt)
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_SYNCDIM, ABSYNC);
+
+    edma3ccRegs->PARAMSET[edma_evt].A_B_CNT =         CSL_FMK(TPCC_PARAM_A_B_CNT_BCNT, X_SIZE)
+                                                    | CSL_FMK(TPCC_PARAM_A_B_CNT_ACNT, 1);
+    edma3ccRegs->PARAMSET[edma_evt].SRC_DST_BIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_DSTBIDX, -1)
+                                                    | CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_SRCBIDX, 1);
+    edma3ccRegs->PARAMSET[edma_evt].LINK_BCNTRLD =    CSL_FMK(TPCC_PARAM_LINK_BCNTRLD_LINK, 0xFFFF);
+    edma3ccRegs->PARAMSET[edma_evt].SRC_DST_CIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_DSTCIDX, PIXELS_PER_LINE)
+                                                    | CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_SRCCIDX, PIXELS_PER_LINE);
+    edma3ccRegs->PARAMSET[edma_evt].CCNT = Y_SIZE;
+}
+
+void SetupEDMA3Reverse( Uint32 edma_evt, int i, int j  )
+{
+    edma3ccRegs->PARAMSET[edma_evt].SRC = (Uint32)image;
+    edma3ccRegs->PARAMSET[edma_evt].DST = (Uint32)image + (i+1)*PIXELS_IN_IMAGE/3 + (j+1)*PIXELS_PER_LINE/3 - PIXELS_PER_LINE - 1;
+
+    edma3ccRegs->PARAMSET[edma_evt].OPT =             CSL_TPCC_PARAM_OPT_RESETVAL
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_TCINTEN, ENABLE)
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_ITCCHEN, ENABLE)
+                                                    | CSL_FMK(TPCC_PARAM_OPT_TCC, edma_evt)
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_SYNCDIM, ABSYNC);
+
+    edma3ccRegs->PARAMSET[edma_evt].A_B_CNT =         CSL_FMK(TPCC_PARAM_A_B_CNT_BCNT, X_SIZE)
+                                                    | CSL_FMK(TPCC_PARAM_A_B_CNT_ACNT, 1);
+    edma3ccRegs->PARAMSET[edma_evt].SRC_DST_BIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_DSTBIDX, -1)
+                                                    | CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_SRCBIDX, 1);
+    edma3ccRegs->PARAMSET[edma_evt].LINK_BCNTRLD =    CSL_FMK(TPCC_PARAM_LINK_BCNTRLD_LINK, 0xFFFF);
+    edma3ccRegs->PARAMSET[edma_evt].SRC_DST_CIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_DSTCIDX, -PIXELS_PER_LINE)
+                                                    | CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_SRCCIDX, PIXELS_PER_LINE);
+    edma3ccRegs->PARAMSET[edma_evt].CCNT = Y_SIZE;
+}
+
+
+void SetupEDMA3UDFlip( Uint32 edma_evt, int i, int j  )
+{
+    edma3ccRegs->PARAMSET[edma_evt].SRC = (Uint32)image;
+    edma3ccRegs->PARAMSET[edma_evt].DST = (Uint32)image + (i+1)*PIXELS_IN_IMAGE/3 + j*PIXELS_PER_LINE/3 - PIXELS_PER_LINE;
+
+    edma3ccRegs->PARAMSET[edma_evt].OPT =             CSL_TPCC_PARAM_OPT_RESETVAL
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_TCINTEN, ENABLE)
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_ITCCHEN, ENABLE)
+                                                    | CSL_FMK(TPCC_PARAM_OPT_TCC, edma_evt)
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_SYNCDIM, ABSYNC);
+
+    edma3ccRegs->PARAMSET[edma_evt].A_B_CNT =         CSL_FMK(TPCC_PARAM_A_B_CNT_BCNT, X_SIZE)
+                                                    | CSL_FMK(TPCC_PARAM_A_B_CNT_ACNT, 1);
+    edma3ccRegs->PARAMSET[edma_evt].SRC_DST_BIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_DSTBIDX, 1)
+                                                    | CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_SRCBIDX, 1);
+    edma3ccRegs->PARAMSET[edma_evt].LINK_BCNTRLD =    CSL_FMK(TPCC_PARAM_LINK_BCNTRLD_LINK, 0xFFFF);
+    edma3ccRegs->PARAMSET[edma_evt].SRC_DST_CIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_DSTCIDX, -PIXELS_PER_LINE)
+                                                    | CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_SRCCIDX, PIXELS_PER_LINE);
+    edma3ccRegs->PARAMSET[edma_evt].CCNT = Y_SIZE;
+}
+
+
+void SetupEDMA3UpLink( Int32 ch )
+{
+    for( int i=ch; i < ch+4; i++ ) {
+        edma3ccRegs->PARAMSET[i].SRC = (Uint32)image;
+
+
+        edma3ccRegs->PARAMSET[i].OPT =               CSL_TPCC_PARAM_OPT_RESETVAL
+                                                        | CSL_FMKT(TPCC_PARAM_OPT_ITCCHEN, ENABLE)
+                                                        | CSL_FMKT(TPCC_PARAM_OPT_TCCHEN, ENABLE)
+                                                        | CSL_FMK(TPCC_PARAM_OPT_TCC, ch)
+                                                        | CSL_FMKT(TPCC_PARAM_OPT_SYNCDIM, ABSYNC);
+
+        edma3ccRegs->PARAMSET[i].A_B_CNT =           CSL_FMK(TPCC_PARAM_A_B_CNT_BCNT, X_SIZE)
+                                                        | CSL_FMK(TPCC_PARAM_A_B_CNT_ACNT, 1);
+        edma3ccRegs->PARAMSET[i].SRC_DST_BIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_DSTBIDX, 2)
+                                                        | CSL_FMK(TPCC_PARAM_SRC_DST_BIDX_SRCBIDX, 1);
+        edma3ccRegs->PARAMSET[i].LINK_BCNTRLD =    CSL_FMK(TPCC_PARAM_LINK_BCNTRLD_LINK, (Uint32)(&edma3ccRegs->PARAMSET[i+1]));
+        edma3ccRegs->PARAMSET[i].SRC_DST_CIDX =    CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_DSTCIDX, PIXELS_PER_LINE*2)
+                                                        | CSL_FMK(TPCC_PARAM_SRC_DST_CIDX_SRCCIDX, PIXELS_PER_LINE*1);
+        edma3ccRegs->PARAMSET[i].CCNT = Y_SIZE;
+    }
+
+    edma3ccRegs->PARAMSET[ch].DST   = (Uint32)image + PIXELS_IN_IMAGE/3 + PIXELS_PER_LINE/3;
+    edma3ccRegs->PARAMSET[ch+1].DST = (Uint32)image + PIXELS_IN_IMAGE/3 + PIXELS_PER_LINE/3 + 1;
+    edma3ccRegs->PARAMSET[ch+2].DST = (Uint32)image + PIXELS_IN_IMAGE/3 + PIXELS_PER_LINE/3 + PIXELS_PER_LINE;
+    edma3ccRegs->PARAMSET[ch+3].DST = (Uint32)image + PIXELS_IN_IMAGE/3 + PIXELS_PER_LINE/3 + PIXELS_PER_LINE + 1;
+
+    edma3ccRegs->PARAMSET[ch+3].OPT =               CSL_TPCC_PARAM_OPT_RESETVAL
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_TCINTEN, ENABLE)
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_ITCCHEN, ENABLE)
+                                                    | CSL_FMK(TPCC_PARAM_OPT_TCC, ch)
+                                                    | CSL_FMKT(TPCC_PARAM_OPT_SYNCDIM, ABSYNC);
+
+    edma3ccRegs->PARAMSET[ch+3].LINK_BCNTRLD =    CSL_FMK(TPCC_PARAM_LINK_BCNTRLD_LINK, 0xFFFF);
+}
+
+
+void main()
+{
+    Int32 i, j, k=0;
+
+    puts("\n=====================================================");
+    puts("          Lab6D - Scaled 2D Memory Move");
+    puts("=====================================================");
+
+    SysConfigForPinMux( );
+    LED_DIPSW_Init( );
+
+    for(i=0; i < PIXELS_IN_IMAGE;i++)
+            image[i] = 200;                 // gray background
+
+    for( i=0; i < Y_SIZE; i++ )
+        for( j=0; j < X_SIZE; j++ )
+            image[i*PIXELS_PER_LINE + j] = org_img[k++];
+
+    puts("Stop here");
+    BIOS_start( );
+}
+
+
+void Task_edma( void )
+{
+
+#if 0
+    ResetEDMA3( );
+    SetupEDMA3UDFlip( EDMA_EVENT5, 1, 0 );
+    CSL_FINS(edma3ccRegs->TPCC_ESR, TPCC_TPCC_ESR_E5, 1);
+    while( (edma3ccRegs->TPCC_IPR & (1<< EDMA_EVENT5)) == 0 );
+
+    ResetEDMA3( );
+    SetupEDMA3LRFlip( EDMA_EVENT5, 0, 1 );
+    CSL_FINS(edma3ccRegs->TPCC_ESR, TPCC_TPCC_ESR_E5, 1);
+    while( (edma3ccRegs->TPCC_IPR & (1<< EDMA_EVENT5)) == 0 );
+
+    ResetEDMA3( );
+    SetupEDMA3Reverse( EDMA_EVENT5, 1, 1 );
+    CSL_FINS(edma3ccRegs->TPCC_ESR, TPCC_TPCC_ESR_E5, 1);
+    while( (edma3ccRegs->TPCC_IPR & (1<< EDMA_EVENT5)) == 0 );
+
+#elif 0
+
+    ResetEDMA3( );
+    SetupEDMA3UpLink(EDMA_EVENT5);
+    CSL_FINS(edma3ccRegs->TPCC_ESR, TPCC_TPCC_ESR_E5, 1);
+    while( (edma3ccRegs->TPCC_IPR & (1<< EDMA_EVENT5)) == 0 );
+
+#else
+
+    /*
+    ResetEDMA3( );
+    SetupEDMA3Parallel( EDMA_EVENT5, 1, 1, 0 );
+    CSL_FINS(edma3ccRegs->TPCC_ESR, TPCC_TPCC_ESR_E5, 1);
+    while( (edma3ccRegs->TPCC_IPR & (1<< EDMA_EVENT5)) == 0 );
+
+    ResetEDMA3( );
+    SetupEDMA3Parallel( EDMA_EVENT5, 1, 1, PIXELS_PER_LINE + 1 );
+    CSL_FINS(edma3ccRegs->TPCC_ESR, TPCC_TPCC_ESR_E5, 1);
+    while( (edma3ccRegs->TPCC_IPR & (1<< EDMA_EVENT5)) == 0 );
+    */
+
+    /*
+    ResetEDMA3( );
+    SetupEDMA3Parallel2( EDMA_EVENT5, 1, 1, 0 );
+    CSL_FINS(edma3ccRegs->TPCC_ESR, TPCC_TPCC_ESR_E5, 1);
+    while( (edma3ccRegs->TPCC_IPR & (1<< EDMA_EVENT5)) == 0 );
+
+    ResetEDMA3( );
+    SetupEDMA3Parallel2( EDMA_EVENT5, 1, 1, PIXELS_PER_LINE );
+    CSL_FINS(edma3ccRegs->TPCC_ESR, TPCC_TPCC_ESR_E5, 1);
+    while( (edma3ccRegs->TPCC_IPR & (1<< EDMA_EVENT5)) == 0 );
+
+    ResetEDMA3( );
+    SetupEDMA3Parallel2( EDMA_EVENT5, 1, 1, PIXELS_PER_LINE + 1 );
+    CSL_FINS(edma3ccRegs->TPCC_ESR, TPCC_TPCC_ESR_E5, 1);
+    while( (edma3ccRegs->TPCC_IPR & (1<< EDMA_EVENT5)) == 0 );
+    */
+
+
+    ResetEDMA3( );
+    SetupEDMA3Diamond( EDMA_EVENT5, 1, 1, 0 );
+    CSL_FINS(edma3ccRegs->TPCC_ESR, TPCC_TPCC_ESR_E5, 1);
+    while( (edma3ccRegs->TPCC_IPR & (1<< EDMA_EVENT5)) == 0 );
+
+    ResetEDMA3( );
+    SetupEDMA3Diamond( EDMA_EVENT5, 1, 1, PIXELS_PER_LINE );
+    CSL_FINS(edma3ccRegs->TPCC_ESR, TPCC_TPCC_ESR_E5, 1);
+    while( (edma3ccRegs->TPCC_IPR & (1<< EDMA_EVENT5)) == 0 );
+
+
+    ResetEDMA3( );
+    SetupEDMA3DiamondR( EDMA_EVENT5, 1, 1, 0);
+    CSL_FINS(edma3ccRegs->TPCC_ESR, TPCC_TPCC_ESR_E5, 1);
+    while( (edma3ccRegs->TPCC_IPR & (1<< EDMA_EVENT5)) == 0 );
+
+    ResetEDMA3( );
+    SetupEDMA3DiamondR( EDMA_EVENT5, 1, 1, -PIXELS_PER_LINE );
+    CSL_FINS(edma3ccRegs->TPCC_ESR, TPCC_TPCC_ESR_E5, 1);
+    while( (edma3ccRegs->TPCC_IPR & (1<< EDMA_EVENT5)) == 0 );
+
+#endif
+
+    System_printf(">> Program Terminated!\n");
+
+    BIOS_exit( 0 );
+}
+
+
+
+
