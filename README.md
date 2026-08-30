@@ -32,24 +32,27 @@ LINE_IN
 - EDMA3가 다음 블록을 전송하는 동안 SYS/BIOS Swi가 이전 블록을 처리
 - 버튼 입력으로 talk-through와 2 Hz 진폭 변조 모드 전환
 
-## Hardware and software
+## Tech stack
 
-| Category | Configuration |
-|---|---|
-| Board/target | TI OMAP-L138 LCDK/EVM |
-| DSP | C6740 floating-point DSP |
-| Codec | TLV320AIC3106 |
-| Codec control | I2C0, source setting 400 |
-| Audio interface | McASP0 (`RBUF14` / `XBUF13`) |
-| DMA | EDMA3, RX event 0 / TX event 1 |
-| Audio input | LINE_IN |
-| Sample format | 48 kHz, 16-bit stereo |
-| RTOS | TI SYS/BIOS 6.76.3.01 |
-| Toolchain | TI C6000 Compiler 8.3.5, `-mv6740` |
-| ABI/target | little-endian, EABI, `ti.targets.elf.C674` |
-| Platform | `ti.platforms.evmOMAPL138` |
+| Layer | Technology | Applied implementation | Evidence |
+|---|---|---|---|
+| Hardware | TI OMAP-L138 LCDK/EVM, C6740 DSP | DSP에서 오디오 데이터와 주변장치 레지스터를 처리 | `labs/LAB7/.ccsproject`, `labs/LAB7/.cproject` |
+| Audio codec | TLV320AIC3106, I2C0 (`I2C_Init(400)`) | I2C 레지스터 설정, LINE_IN ADC와 DAC 경로 구성 | `labs/LAB7/lib/Codec.c`, `labs/LAB7/lib/I2C.c` |
+| Language | C99 | 메모리 매핑 레지스터, 인터럽트 핸들러, DSP 신호처리 구현 | `labs/LAB7/.cproject`, `labs/LAB7/*.c` |
+| IDE/build | Code Composer Studio 9.3.0 | CCS 프로젝트 import/build/debug | `labs/LAB7/.ccsproject` |
+| Compiler/target | TI C6000 Compiler 8.3.5, `-mv6740` | C6740용 ELF 바이너리 생성 | `labs/LAB7/.cproject` |
+| RTOS | TI SYS/BIOS 6.76.3.01 | Hwi, Swi, Clock, Idle, Task 실행 단위 구성 | `labs/LAB7/app.cfg` |
+| RTOS/XDC | XDCtools 3.60.2.34_core, `ti.targets.elf.C674`, `ti.platforms.evmOMAPL138` | SYS/BIOS configuration과 target/platform 생성 | `labs/LAB7/.cproject`, `labs/LAB7/app.cfg` |
+| SDK/API | OMAP-L138 PDK 1.0.11, CSL | 보드 레지스터 정의와 저수준 peripheral access | `labs/LAB7/.cproject`, `labs/LAB7/lib/*.h` |
+| Peripheral drivers | SYSCFG/PINMUX, GPIO, I2C, McASP0, Timer, DSP interrupt controller | 버튼·LED·codec·오디오 직렬 포트 초기화와 interrupt 연결 | `labs/LAB7/lib/*.c` |
+| DMA | EDMA3 | McASP RX/TX와 메모리 버퍼 연결, PARAMSET·transfer complete interrupt | `labs/LAB7/lib/EDMA_McASP.c`, `labs/LAB7/HWI.c` |
+| Audio format | 48 kHz, 16-bit, stereo PCM | `[left 16-bit][right 16-bit]` 32-bit word와 400-sample block 처리 | `labs/LAB7/define.h`, `labs/LAB7/SWI.c` |
+| Buffering | Ping/pong double buffering | EDMA 전송과 Swi 신호처리를 겹쳐 실행 | `labs/LAB7/HWI.c`, `labs/LAB7/SWI.c` |
+| DSP processing | sine generation, 2 Hz amplitude modulation, talk-through | 좌·우 샘플을 분리해 처리 후 32-bit word로 재결합 | `labs/LAB7/sinef.c`, `labs/LAB7/SWI.c` |
+| Memory/linker | little-endian, EABI, ELF, TI linker command file | 코드/데이터 메모리 배치와 `.image` section 지정 | `labs/LAB7/.cproject`, `labs/LAB6/LAB6B/mylinker.cmd` |
+| Debug support | JTAG debug, GEL script | 타깃 디버깅과 LAB3A 실험 보조 | `labs/LAB3/LAB3A/my_gel.gel` |
 
-주변장치는 CSL/PDK 헤더와 메모리 매핑 레지스터를 이용해 초기화한다. 코덱 레지스터는 I2C로 설정하고, McASP의 serializer와 frame sync를 구성한 뒤 EDMA PARAMSET에 주변장치 레지스터와 메모리 버퍼를 연결한다.
+주변장치는 CSL/PDK 헤더와 메모리 매핑 레지스터를 이용해 초기화한다. 저장소에서 실제로 확인되는 기술만 기록했으며, Linux·FreeRTOS·FPGA·FFT 라이브러리 등은 사용 기술로 기재하지 않았다.
 
 ## Real-time implementation
 
